@@ -89,6 +89,13 @@ app.post("/rsvp", async function (req, res) {
         if (isNaN(attendees) || attendees < 1) attendees = 1;
         if (attendees > 20) attendees = 20;
 
+        // Evitar duplicados: mismo nombre (sin importar mayúsculas/espacios).
+        const escapado = name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+        const existe = await Guest.findOne({ name: { $regex: "^" + escapado + "$", $options: "i" } });
+        if (existe) {
+            return res.status(409).json({ ok: false, error: "Ese nombre ya confirmó asistencia." });
+        }
+
         const guest = await Guest.create({
             name: name,
             attendees: attendees,
