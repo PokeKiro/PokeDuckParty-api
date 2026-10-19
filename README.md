@@ -14,6 +14,8 @@ con esta API, sin trucos ni intermediarios.
 | POST   | `/claim`                      | Marca poción canjeada `{name}`                  |
 | GET    | `/admin`                      | Página web del panel de admin                   |
 | GET    | `/admin/guests?token=XXX`     | Lista COMPLETA en JSON (incluye mensajes)       |
+| DELETE | `/admin/guest/:id?token=XXX`  | Borra un registro por id                        |
+| DELETE | `/admin/all?token=XXX`        | Borra TODOS los registros                       |
 
 ## Variables de entorno
 
@@ -42,6 +44,8 @@ con esta API, sin trucos ni intermediarios.
 - Abre `https://TU-API.up.railway.app/admin`
 - Escribe tu `ADMIN_TOKEN` y carga la lista.
 - Verás todo: nombres, personas, personaje, **mensajes privados**, poción y fecha.
+- Puedes **borrar un registro** (botón X en su fila) o **borrar todo** (botón rojo),
+  útil para limpiar las pruebas antes de mandar el link a los invitados.
 
 ## Probar local (opcional)
 

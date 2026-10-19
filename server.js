@@ -137,6 +137,37 @@ app.get("/admin/guests", async function (req, res) {
     }
 });
 
+/* ---------- DELETE /admin/guest/:id -> borrar un registro ---------- */
+app.delete("/admin/guest/:id", async function (req, res) {
+    if (!ensureDb(res)) return;
+    const token = req.query.token || req.headers["x-admin-token"];
+    if (!token || token !== ADMIN_TOKEN) {
+        return res.status(401).json({ ok: false, error: "No autorizado" });
+    }
+    try {
+        const r = await Guest.findByIdAndDelete(req.params.id);
+        if (!r) return res.status(404).json({ ok: false, error: "No encontrado" });
+        res.json({ ok: true });
+    } catch (e) {
+        res.status(500).json({ ok: false, error: "No se pudo borrar" });
+    }
+});
+
+/* ---------- DELETE /admin/all -> borrar TODOS los registros ---------- */
+app.delete("/admin/all", async function (req, res) {
+    if (!ensureDb(res)) return;
+    const token = req.query.token || req.headers["x-admin-token"];
+    if (!token || token !== ADMIN_TOKEN) {
+        return res.status(401).json({ ok: false, error: "No autorizado" });
+    }
+    try {
+        const r = await Guest.deleteMany({});
+        res.json({ ok: true, deleted: r.deletedCount });
+    } catch (e) {
+        res.status(500).json({ ok: false, error: "No se pudo borrar" });
+    }
+});
+
 /* ---------- Panel de admin (página simple) ---------- */
 app.get("/admin", function (req, res) {
     res.type("html").send(ADMIN_HTML);
@@ -161,26 +192,56 @@ const ADMIN_HTML = `<!DOCTYPE html>
 <body>
   <h1>🦆⚡ Panel de confirmados</h1>
   <p>Escribe tu token de admin y carga la lista.</p>
-  <div><input id="tok" type="password" placeholder="Token de admin" size="30"> <button onclick="load()">Cargar</button></div>
+  <div>
+    <input id="tok" type="password" placeholder="Token de admin" size="30">
+    <button onclick="load()">Cargar</button>
+    <button id="delAll" onclick="borrarTodo()" style="background:#ef4444;color:#fff;display:none;">Borrar TODO</button>
+  </div>
   <p id="summary"></p>
   <div id="out"></div>
 <script>
   function esc(s){return String(s==null?"":s).replace(/[&<>"']/g,function(m){return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}[m];});}
+  function token(){ return document.getElementById("tok").value.trim(); }
+
   async function load(){
-    var t=document.getElementById("tok").value.trim();
+    var t=token();
     var out=document.getElementById("out"), sum=document.getElementById("summary");
     out.innerHTML="Cargando..."; sum.textContent="";
     try{
       var r=await fetch("/admin/guests?token="+encodeURIComponent(t));
       var d=await r.json();
-      if(!d.ok){ out.innerHTML="<span style='color:#f87171'>"+esc(d.error||"Error")+"</span>"; return; }
+      if(!d.ok){ out.innerHTML="<span style='color:#f87171'>"+esc(d.error||"Error")+"</span>"; document.getElementById("delAll").style.display="none"; return; }
       sum.innerHTML="Registros: <span class='tot'>"+d.total+"</span> · Personas: <span class='tot'>"+d.totalPersonas+"</span>";
+      document.getElementById("delAll").style.display = d.total>0 ? "inline-block" : "none";
       var rows=d.guests.map(function(g){
         var fecha=g.createdAt?new Date(g.createdAt).toLocaleString():"";
-        return "<tr><td>"+esc(g.name)+"</td><td>"+(g.attendees||1)+"</td><td>"+esc(g.fav||"")+"</td><td class='msg'>"+esc(g.message||"")+"</td><td>"+(g.potion?"<span class='pill'>🍹 sí</span>":"—")+"</td><td>"+esc(fecha)+"</td></tr>";
+        return "<tr><td>"+esc(g.name)+"</td><td>"+(g.attendees||1)+"</td><td>"+esc(g.fav||"")+"</td><td class='msg'>"+esc(g.message||"")+"</td><td>"+(g.potion?"<span class='pill'>🍹 sí</span>":"—")+"</td><td>"+esc(fecha)+"</td>"+
+               "<td><button onclick=\\"borrarUno('"+g._id+"')\\" style='background:#ef4444;color:#fff;padding:.2rem .5rem;font-size:.7rem;'>X</button></td></tr>";
       }).join("");
-      out.innerHTML="<table><thead><tr><th>Nombre</th><th>Personas</th><th>Personaje</th><th>Mensaje (privado)</th><th>Poción</th><th>Fecha</th></tr></thead><tbody>"+rows+"</tbody></table>";
+      out.innerHTML="<table><thead><tr><th>Nombre</th><th>Personas</th><th>Personaje</th><th>Mensaje (privado)</th><th>Poción</th><th>Fecha</th><th></th></tr></thead><tbody>"+rows+"</tbody></table>";
     }catch(e){ out.innerHTML="<span style='color:#f87171'>Error de red</span>"; }
+  }
+
+  async function borrarUno(id){
+    if(!confirm("¿Borrar este registro?")) return;
+    try{
+      var r=await fetch("/admin/guest/"+id+"?token="+encodeURIComponent(token()),{method:"DELETE"});
+      var d=await r.json();
+      if(!d.ok){ alert(d.error||"No se pudo borrar"); return; }
+      load();
+    }catch(e){ alert("Error de red"); }
+  }
+
+  async function borrarTodo(){
+    if(!confirm("¿Borrar TODOS los registros? Esto no se puede deshacer.")) return;
+    if(!confirm("Seguro? Se borrara la lista completa.")) return;
+    try{
+      var r=await fetch("/admin/all?token="+encodeURIComponent(token()),{method:"DELETE"});
+      var d=await r.json();
+      if(!d.ok){ alert(d.error||"No se pudo borrar"); return; }
+      alert("Borrados: "+d.deleted);
+      load();
+    }catch(e){ alert("Error de red"); }
   }
 </script>
 </body></html>`;
